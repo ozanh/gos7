@@ -380,7 +380,7 @@ func (mb *client) Read(variable string) (value interface{}, err error) {
 		return
 	}
 	//var area, dbNumber, start, amount, wordLen int
-	var buffer []byte
+	var buffer = make([]byte, 255)
 	switch valueArea := variable[0:2]; valueArea {
 	case "EB": //input byte
 	case "EW": //input word
@@ -431,7 +431,41 @@ func (mb *client) Read(variable string) (value interface{}, err error) {
 	default:
 		switch otherArea := variable[0:1]; otherArea {
 		case "E":
+			fallthrough
 		case "I": //input
+			var (
+				startAddr int64
+				mBit      int64
+			)
+			inputArray := strings.SplitN(variable[1:], ".", 2)
+			if len(inputArray) != 2 || inputArray[0] == "" || inputArray[1] == "" {
+				err = fmt.Errorf("input variable is invalid, variable should be S7 syntax")
+				return
+			}
+			startAddr, err = strconv.ParseInt(inputArray[0], 10, 16)
+			if err != nil {
+				return
+			}
+			mBit, err = strconv.ParseInt(inputArray[1], 10, 16)
+			if err != nil {
+				return
+			}
+			if mBit > 7 || mBit < 0 {
+				err = fmt.Errorf("Input read bit is invalid")
+				return
+			}
+			sbuffer := make([]byte, 1)
+			err = mb.AGReadEB(int(startAddr), 1, sbuffer)
+			if err != nil {
+				return
+			}
+			mask := []byte{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}
+			sbuffer[0] = sbuffer[0] & mask[mBit]
+			var result bool
+			helper := Helper{}
+			helper.GetValueAt(sbuffer, 0, &result)
+			value = result
+			return
 		case "A":
 		case "0": //output
 		case "M": //memory
