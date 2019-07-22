@@ -400,9 +400,27 @@ func (mb *client) Read(variable string) (value interface{}, err error) {
 		dbNo, _ := strconv.ParseInt(string(string(dbArray[0])[2:]), 10, 16)
 		dbIndex, _ := strconv.ParseInt(string(string(dbArray[1])[3:]), 10, 16)
 		dbType := string(dbArray[1])[0:3]
+		var dbSize int
+		if len(dbArray) == 3 {
+			var v int64
+			v, err = strconv.ParseInt(string(dbArray[2]), 10, 16)
+			if err != nil {
+				err = fmt.Errorf("read size is invalid")
+				return
+			} else if v > 255 {
+				err = fmt.Errorf("read size is invalid")
+			}
+			dbSize = int(v)
+		}
 
 		switch dbType {
 		case "DBB": //byte
+			// e.g. DB1.DBB10.18, this can be used to read strings, helper.GetCharsAt helps to convert to string
+			if dbSize > 0 {
+				err = mb.AGReadDB(int(dbNo), int(dbIndex), dbSize, buffer)
+				value = buffer[:dbSize]
+				return
+			}
 			err = mb.AGReadDB(int(dbNo), int(dbIndex), 1, buffer)
 			value = buffer[0]
 			return
